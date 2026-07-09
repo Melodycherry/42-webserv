@@ -43,10 +43,9 @@ Once the server is running, you can test its functionality via:
 | Test | Commande | output |
 |---|---|---|
 | GET  | `curl -v http://localhost:8080/` | `200 OK` |
-| GET with file | `curl -v http://localhost:8080/index.html` | Affichage du fichier `index.html` |
+| GET with file | `curl -v http://localhost:8080/index.html` | Display `index.html` |
 | GET non-existing | `curl -v http://localhost:8080/nop.html` | `404 Not Found` |
-| GET (index / autoindex) | `curl -v http://localhost:8080/Assets/` | Si autoindex = `on` → affichage du dossier, sinon → `403 Forbidden` |
-| HEAD (headers uniquement) | `curl -vI http://localhost:8080/index.html` | Retourne uniquement les headers. Le body doit être totalement absent, même si `Content-Length > 0` |
+| GET (index / autoindex) | `curl -v http://localhost:8080/Assets/` | If autoindex = `on` → display folder, otherwise → `403 Forbidden` |
 |...|...|...|
 
 
