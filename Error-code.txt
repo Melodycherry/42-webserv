@@ -1,0 +1,27 @@
+TYPE DE REPONSE ET CODE D ERREUR 
+
+Successfull
+200 - OK
+201 - OK
+204 - OK
+
+Redir
+301 - moved permanently
+302 - found
+307 - temporary redirect
+308 - Permanent redirect
+
+
+Erreur 
+400 - Bad request
+403 - Forbidden
+404 - not Found
+405 - method not Allowed
+413 - Payload too Large
+414 - Uri too long
+415 - Unsupported media Type
+431 - Header field too Large
+
+Internal
+500 - Internal server error
+

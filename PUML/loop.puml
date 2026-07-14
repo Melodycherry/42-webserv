@@ -1,0 +1,306 @@
+@startuml
+!theme blueprint
+start
+
+
+:LA CREATION D UNE SOCKET;
+
+note right
+
+P R O T O T Y P E S
+
+end note
+
+note left
+
+U T I L I S A T I O N
+
+end note
+
+:Créer objet Classe;
+
+-> Mets a jour le addr info res - Transforme un hostname + port en liste de structures addrinfo;
+
+:int getaddrinfo();
+
+note right
+int getaddrinfo(
+    const char *node,
+    const char *service,
+    const struct addrinfo *hints, 
+    struct addrinfo **res
+)
+0 on success non-zero on error
+end note
+
+note left
+struct addrinfo hints;
+struct addrinfo *res;
+
+memset(&hints, 0, sizeof hints);
+hints.ai_family = AF_INET;
+hints.ai_socktype = SOCK_STREAM;
+hints.ai_flags = AI_PASSIVE;
+
+getaddrinfo(NULL, "8080", &hints, &res);
+end note
+
+->récupérer le sockfd → store dans la classe ;
+:int socket();
+
+note left
+int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+end note
+
+note right 
+int socket(int domain, int type, int protocol);
+-1 on error
+end note
+
+-> configurer des options sur une socket ;
+:setsockopt();
+
+note left
+int opt = 1;
+setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+end note
+
+-> modifier les propriétés d’un file descriptor :rendre le socket non bloquant;
+:fcntl();
+
+note left
+int flags = fcntl(sockfd, F_GETFL, 0);
+fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+end note
+
+-> attacher le socket a une adresse ip et un port;
+:bind();
+
+note left
+bind(sockfd, res->ai_addr, res->ai_addrlen);
+end note
+
+-> mettre le socket en mode serveur;
+:listen();
+
+-> free le res une fois terminé;
+:freeaddrinfo(res);
+
+:listen();
+
+note right
+socket en écoute
+end note
+
+
+partition "Boucle d'écoute du socket" {
+
+	while (signal != SIGINT)
+
+		:poll();
+
+		:parcourir tous les fd;
+
+		if (POLLIN ?) then (oui)
+
+			if (fd == server_fd) then (oui)
+
+				partition "AcceptClient()" {
+					while (true)
+						:client_fd = accept(server_fd);
+
+						if (client_fd < 0 ?) then (oui)
+							if (errno == EAGAIN) then (oui)
+								break
+							else (non)
+								:log erreur;
+								break
+							endif
+						endif
+
+						:mettre client_fd en non-blocking;
+						:ajouter client_fd dans poll;
+
+					endwhile
+				}
+
+			else (fd client)
+
+				partition "handleRequest()" {
+
+					:recv();
+
+					if (bytes <= 0 ?) then (oui)
+						:close(fd);
+						:remove fd du poll;
+						detach
+					endif
+
+					:append buffer au SocketClient;
+
+					if (buffer size > MAX_REQUEST_SIZE ?) then (oui)
+						:[413 Payload Too Large];
+						detach
+					endif
+
+					if (header complet ?) then (non)
+						:attendre prochain recv;
+						detach
+					endif
+
+					if (header déjà parsé ?) then (non)
+						:parse request line;
+
+						if (request line invalide ?) then (oui)
+							:[400 Bad Request];
+							detach
+						endif
+
+						:parse headers;
+
+						:déterminer type de body;
+						note right
+						- chunked ?
+						- content-length ?
+						- sinon no body
+						end note
+
+						:marquer headerParsed = true;
+					endif
+
+					if (méthode GET ou DELETE ?) then (oui)
+						note right
+						On DOIT lire le body s'il existe
+						mais on peut l'ignorer côté logique
+						end note
+					endif
+
+					if (chunked ?) then (oui)
+						:parsingChunked() (incrémental);
+					elseif (content-length ?) then (oui)
+						:parsingContentLength() (incrémental);
+					else (non)
+						:parsingNoBody();
+					endif
+
+					if (requête complète ?) then (oui)
+						:setPollOut(fd);
+					else (non)
+						:attendre prochain recv;
+						detach
+					endif
+				}
+
+				partition "HTTP parsing" {
+
+					:parse request line;
+
+					if (request line invalide ?) then (oui)
+						:[400 Bad Request];
+						detach
+					endif
+
+					:parse headers;
+
+					if (Content-Length présent ?) then (oui)
+						:attendre body complet;
+					endif
+
+				}
+
+				partition "routing serveur" {
+					:Selection serveur via Host header;
+					:Selection location;
+				}
+
+				if (Méthode autorisée ?) then (non)
+					:[405 Method not allowed];
+					detach
+				endif
+
+				if (Taille Body ok ?) then (non)
+					:[413 Payload too large];
+					detach
+				endif
+
+				if (Ressource existe ?) then (non)
+					:[404 Not found];
+					detach
+				endif
+
+				partition "méthode HTTP" {
+
+					if (HTTP method ?)
+
+					elseif (GET)
+						:Lire fichier;
+						:Génération body;
+						:Creation HTTP response;
+						:Ajout headers;
+
+					elseif (POST)
+
+						if (CGI ?) then (oui)
+
+							partition "CGI execution" {
+								:création pipes;
+								:fork();
+
+								if (process enfant ?) then (oui)
+									:execve CGI;
+								else (non)
+									:read stdout CGI;
+								endif
+							}
+
+						else (non)
+							:Upload fichier;
+						endif
+
+						:Creation HTTP response;
+
+					elseif (DELETE)
+						:Suppression ressource;
+
+						if (suppression ok ?) then (oui)
+							:[200 / 204];
+						else (non)
+							:[403 / 404];
+						endif
+
+					endif
+				}
+
+			endif
+		endif
+
+
+		if (POLLOUT ?) then (oui)
+
+			partition "sendResponse" {
+
+				:send();
+
+				if (response fully sent ?) then (oui)
+
+					if (connection close ?) then (oui)
+						:close socket;
+					else (non)
+						:reset état requête;
+					endif
+
+				else (non)
+					:attendre prochain POLLOUT;
+					detach
+				endif
+
+			}
+
+		endif
+
+	endwhile
+}
+
+stop
+
+@enduml

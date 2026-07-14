@@ -1,0 +1,171 @@
+@startuml
+!theme blueprint
+
+start
+
+:LA CREATION D UNE SOCKET;
+
+note right
+
+P R O T O T Y P E S
+
+end note
+
+note left
+
+U T I L I S A T I O N
+
+end note
+
+:Créer objet Classe;
+
+-> Mets a jour le addr info res - Transforme un hostname + port en liste de structures addrinfo;
+
+:int getaddrinfo();
+' voir ce qu on récupère de .conf
+note right
+int getaddrinfo(
+    const char *node, → Nom d’hôte ou adresse IP. Pour un serveur, on met souvent NULL.
+     const char *service, → p.ex 8080
+    const struct addrinfo *hints, 
+    struct addrinfo **res
+)
+
+0 on success non-zero on error
+end note
+
+note left
+
+struct addrinfo hints; → locale, pas besoin de free.
+struct addrinfo *res; → allouée dynamiquement par getaddrinfo → freeaddrinfo(res)
+
+memset(&hints, 0, sizeof hints);
+hints.ai_family = AF_INET;
+hints.ai_socktype = SOCK_STREAM;
+hints.ai_flags = AI_PASSIVE; → indique que l’adresse sera utilisée pour bind() d’un serveur.
+
+getaddrinfo(NULL, "8080", &hints, &res);
+
+end note
+
+->récupérer le sockfd → store dans la classe ;
+:int socket();
+note right 
+int socket(
+    int domain, 
+    int type, 
+    int protocol
+);
+
+-1 on error
+end note
+
+note left
+
+int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+
+end note
+
+-> configurer des options sur une socket ;
+
+:setsockpt();
+
+note left
+
+int opt = 1;
+setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+end note
+
+note right
+setsockpt(
+    int sockfd, → recup par socket()
+    int level, → SOL_SOCKET → niv de config
+    int optname, → SO_REUSADDR → option activée
+    const void *optval, → int optval = 1; → valeur de l’option
+    socklen_t optlen → taille de la valeur
+);
+
+lvls :
+    SOL_SOCKET  option générale de socket
+    IPPROTO_TCP	option spécifique TCP
+    IPPROTO_IP	option IPv4
+
+
+-1 on error ???? verif ca
+end note
+
+
+-> modifier les propriétés d’un file descriptor :rendre le socket non bloquant;
+
+:fcntl();
+note left
+
+int flags = fcntl(sockfd, F_GETFL, 0); → get les flags
+fcntl(sockfd, F_SETFL, flags | O_NONBLOCK); → rajouter le flag non bloquant
+
+end note
+
+note right
+int fcntl(
+    int fd, → file descriptor
+    int cmd, → commande à appliquer
+    ... /* arg */ → argument optionnel
+);
+
+cmds :
+    F_GETFL	récupérer les flags
+    F_SETFL	modifier les flags
+    F_DUPFD	dupliquer un FD
+    F_GETFD	récupérer flags descriptor
+    F_SETFD	modifier flags descriptor
+
+-1 on error ???? verif ca
+end note
+
+-> attacher le socket a une adresse ip et un port;
+:bind();
+
+note left
+
+bind(sockfd, res->ai_addr, res->ai_addrlen);
+
+end note
+
+note right
+int bind(
+    int sockfd, → file descriptor
+    const struct sockaddr *addr, → 
+    socklen_t addrlen →
+);
+
+-1 on error / 0 on success
+end note
+
+
+-> mettre le socket en mode serveur;
+:listen();
+
+note left
+
+bind(sockfd, res->ai_addr, res->ai_addrlen);
+
+end note
+
+note right
+int listen(
+    int sockfd, → file descriptor
+    int backlog → taille de la file d ‘attente des connexions
+);
+
+-1 on error ???? verif ca
+
+end note
+
+-> free le res une fois terminé si pas mis en RAII dans la classe socket;
+:freeaddrinfo(res);
+
+stop
+
+@enduml
+

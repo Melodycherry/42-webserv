@@ -1,6 +1,6 @@
-# 🌐 WEBSERV
-
 *This project has been created as part of the 42 curriculum by `hlichten` and `mlaffita`*
+
+# 🌐 WEBSERV
 
 ## 📖 Description   
 
@@ -8,7 +8,7 @@ Webserv is a HTTP/1.1 server developed in C++ 98.
 The goal is to recreate NGINX (in a simplified way) : write a program that listens on a port, receives HTTP requests from browsers (Chrome, Safari, curl), parses them and returns a response (an HTML page, a file, or an error)    
 
 🛠️ **Key Features:**  
-- Multiplexing ( uses a single multiplexer (`poll`) to monitor all I/O operations (read/write) simultaneously.
+- Multiplexing ( uses a single multiplexer (`poll`) to monitor all I/O operations (read/write) simultaneously)  
 - HTTP Protocol Support (fully handles GET, POST, and DELETE methods)
 - Custom Configuration ( Nginx-like configuration files)
 - CGI Execution ( python, php, ...)

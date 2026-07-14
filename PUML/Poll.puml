@@ -1,0 +1,53 @@
+@startuml
+!theme blueprint
+
+start
+
+:Initialisation du serveur;
+
+note right
+Pour chaque SocketServer :
+- createSocket()
+- bindListen()
+- Créer struct pollfd
+- events = POLLIN
+- push_back dans _pollFds
+end note
+
+:Début de la boucle eventLoop;
+
+while (_running)
+    :poll(_pollFds, timeout);
+
+    if (ret <= 0) then (timeout ou erreur)
+        :continuer la boucle;
+    endif
+
+    :Parcourir tous les pollfd dans _pollFds;
+
+    if (pfd.revents & POLLIN) then (événement lecture)
+        if (pfd.fd est server_fd) then (oui)
+            :accept() nouveau client;
+            :mettre client_fd en non-blocking;
+            :Créer pollfd pour client;
+            :push_back dans _pollFds;
+            :Ajouter client dans _socketClients;
+        else (fd client)
+            :recv() sur client_fd;
+            if (bytes <= 0 ?) then (oui)
+                :close(client_fd);
+                :supprimer client du vector pollFds;
+                :supprimer client du map _socketClients;
+            endif
+        endif
+    endif
+
+    if (pfd.revents & POLLOUT) then (événement écriture)
+        :send() sur client_fd;
+        :retirer POLLOUT si tout envoyé;
+    endif
+
+endwhile
+
+stop
+@enduml
