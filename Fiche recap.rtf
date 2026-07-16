@@ -1,0 +1,263 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2761
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\froman\fcharset0 Times-Bold;\f1\froman\fcharset0 Times-Roman;\f2\fmodern\fcharset0 Courier;
+\f3\fmodern\fcharset0 Courier-Bold;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;\red0\green0\blue233;}
+{\*\expandedcolortbl;;\cssrgb\c0\c0\c0;\cssrgb\c0\c0\c93333;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh17980\viewkind0
+\deftab720
+\pard\pardeftab720\sa321\partightenfactor0
+
+\f0\b\fs48 \cf0 \expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Fiche recap\'92\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\fs28 \cf0 Check the code and ask questions\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\fs24 \cf0 \'b7 Basic HTTP server :
+\f1\b0 \uc0\u8232 Un serveur HTTP fonctionne selon le mod\'e8le 
+\f0\b client-serveur.
+\f1\b0 \uc0\u8232 Le serveur cr\'e9e un 
+\f0\b socket
+\f1\b0  (
+\f2\fs26 socket()
+\f1\fs24 ), le lie \'e0 un port (
+\f2\fs26 bind()
+\f1\fs24 ), et \'e9coute les connexions (
+\f2\fs26 listen()
+\f1\fs24 )\uc0\u8232 Un client (navigateur) se connecte \u8594  le serveur 
+\f0\b accepte
+\f1\b0  la connexion (
+\f2\fs26 accept()
+\f1\fs24 ) \uc0\u8594  un nouveau fd est cr\'e9\'e9\u8232 Le client envoie une 
+\f0\b requ\'eate HTTP
+\f1\b0  (m\'e9thode, headers, body) \uc0\u8594  le serveur la parse\u8232 Le serveur envoie une 
+\f0\b r\'e9ponse HTTP
+\f1\b0  (status code, headers, body)\uc0\u8232 La connexion est ferm\'e9e ou r\'e9utilis\'e9e (keep-alive)\
+\'b7 
+\f0\b Fonction utilis\'e9e pour multiplexing :
+\f1\b0 \uc0\u8232 
+\f2\fs26 poll()
+\f1\fs24  permet de surveiller plusieurs file descriptors simultan\'e9ment sans bloquer le programme. C'est ce qui permet de g\'e9rer plusieurs clients en parall\'e8le dans un seul thread.\
+
+\f0\b \'b7 Comment poll() fonctionne:
+\f1\b0 \uc0\u8232 Explication prototype de la fonction\u8232 On lui passe un tableau de 
+\f3\b\fs26 pollfd
+\f1\b0\fs24 , chaque entr\'e9e contenant\uc0\u8232 
+\f2\fs26 fd
+\f1\fs24  : le file descriptor \'e0 surveiller\uc0\u8232 
+\f2\fs26 events
+\f1\fs24  : les \'e9v\'e9nements qu'on veut surveiller (
+\f2\fs26 POLLIN
+\f1\fs24 , 
+\f2\fs26 POLLOUT
+\f1\fs24 )\uc0\u8232 
+\f2\fs26 revents
+\f1\fs24  : les \'e9v\'e9nements qui se sont 
+\f0\b r\'e9ellement produits
+\f1\b0  (rempli par le kernel)\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f2\fs26 \cf0 poll()
+\f1\fs24  
+\f0\b bloque
+\f1\b0  jusqu'\'e0 ce qu'au moins un fd soit pr\'eat (ou que le timeout expire). On it\'e8re ensuite sur le tableau et on traite chaque fd dont 
+\f2\fs26 revents
+\f1\fs24  est non nul.\uc0\u8232 Difference avec select :\u8232 Pas de limite \'e0 1024 connexions car prend un tab dynamique\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b \cf0 \'b7 Only poll() pour accept et read/write
+\f1\b0 \uc0\u8232 Oui un seul poll() dans la boucle principale qui g\'e8re tout.\u8232 Les 
+\f0\b fds serveurs
+\f1\b0  (sockets d'\'e9coute) sont dans le tableau \uc0\u8594  quand 
+\f2\fs26 POLLIN
+\f1\fs24  est d\'e9tect\'e9 sur eux, on appelle 
+\f2\fs26 acceptClient()
+\f1\fs24  pour accepter une nouvelle connexion\uc0\u8232 Les 
+\f0\b fds clients
+\f1\b0  sont ajout\'e9s dynamiquement \uc0\u8594  
+\f2\fs26 POLLIN
+\f1\fs24  = lire la requ\'eate, 
+\f2\fs26 POLLOUT
+\f1\fs24  = envoyer la r\'e9ponse\uc0\u8232 Tout passe par 
+\f0\b le m\'eame appel 
+\f3\fs26 poll()
+\f1\b0\fs24  dans 
+\f2\fs26 pollLoop()
+\f1\fs24 \
+
+\f0\b \'b7 poll() dans la main loop, v\'e9rifie READ et WRITE en m\'eame temps
+\f1\b0 \uc0\u8232 Une seule iteration . 
+\f2\fs26 poll()
+\f1\fs24  est appel\'e9 une seule fois par tour de boucle et surveille simultan\'e9ment 
+\f2\fs26 POLLIN
+\f1\fs24  et 
+\f2\fs26 POLLOUT
+\f1\fs24  sur tous les fds.\
+
+\f0\b \'b7 Un seul read/write par client par 
+\f3\fs26 poll()
+\f1\b0\fs24 \uc0\u8232 Un seul POLLIN \u8594  un seul handleRequest() ou acceptClient(). Check ds la boucle poll()\u8232 Pour chaque fd, on ne lit qu'une fois et on n'\'e9crit qu'une fois par it\'e9ration de 
+\f2\fs26 poll()
+\f1\fs24 \
+
+\f0\b \'b7 Si erreur, client is removed
+\f1\b0 \uc0\u8232 Oui, check 
+\f3\b\fs26 recv()
+\f1\b0\fs24  dans 
+\f3\b\fs26 handleRequest()
+\f1\b0\fs24 \uc0\u8232 aussi 
+\f3\b\fs26 send()
+\f1\b0\fs24  dans 
+\f3\b\fs26 sendResponse()
+\f1\b0\fs24 \
+
+\f0\b \'b7 Valeur de retour correct ( pas juste 0 ou -1)
+\f1\b0 \uc0\u8232 Oui dans recv() les 2 cas sont verif s\'e9par\'e9ment.\u8232 Si valeur positive on a traitement normal\
+
+\f0\b \'b7 Est-ce que 
+\f3\fs26 errno
+\f0\fs24  est v\'e9rifi\'e9 apr\'e8s 
+\f3\fs26 recv
+\f0\fs24 /
+\f3\fs26 send ?
+\f1\b0\fs24 \uc0\u8232 Un errno au debut de la poll loop donc ok. Les autres ont \'e9t\'e9 supp\
+
+\f0\b \'b7 Aucun read/write sans passer par 
+\f3\fs26 poll()
+\f1\b0\fs24 \uc0\u8232 Tous les 
+\f2\fs26 recv
+\f1\fs24 /
+\f2\fs26 send
+\f1\fs24  sur les sockets clients sont appel\'e9s 
+\f0\b uniquement depuis
+\f1\b0  
+\f2\fs26 handleRequest()
+\f1\fs24  et 
+\f2\fs26 sendResponse()
+\f1\fs24 , qui sont eux-m\'eames appel\'e9s 
+\f0\b uniquement depuis
+\f1\b0  
+\f2\fs26 pollLoop()
+\f1\fs24 , apr\'e8s d\'e9tection de 
+\f2\fs26 POLLIN
+\f1\fs24 /
+\f2\fs26 POLLOUT
+\f1\fs24  par 
+\f2\fs26 poll()
+\f1\fs24 \
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f0\b\fs28 \cf0 Configuration\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\fs24 \cf0 \'b7 HTTP response status codes list
+\f1\b0 \uc0\u8232 Fichier txt dispo dans le projet\
+
+\f0\b \'b7 multiples server with different port
+\f1\b0 \uc0\u8232 Oui, ds le fichier conf on a 8080, 8081, 8082, 8083, 8084, 9090\
+
+\f0\b \'b7 Plusieurs serveurs avec des hostnames diff\'e9rents (Virtual Host)
+\f1\b0 \uc0\u8232 Oui, on a 8080 avec 
+\f2\fs26 server_name
+\f1\fs24  et 
+\f2\fs26 vhost.com
+\f1\fs24 \uc0\u8232 
+\f2\fs26 printf "GET / HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n" | nc 127.0.0.1 8080
+\f1\fs24 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f2\fs26 \cf0 printf "GET / HTTP/1.1\\r\\nHost: [vhost.com](<http://vhost.com/>)\\r\\nConnection: close\\r\\n\\r\\n" | nc 127.0.0.1 8080
+\f1\fs24 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b \cf0 \'b7 page d erreur personnalis\'e9
+\f1\b0 \uc0\u8232 Oui, error_page 404 /errors/404.html; si on fait :\u8232 
+\f2\fs26 curl <http://127.0.0.1:8080/page-qui-nexiste-pas
+\f1\fs24 >\uc0\u8232 va retourner notre 404 page perso\
+
+\f0\b \'b7 body limit
+\f1\b0 \uc0\u8232 Oui, plusieurs serveurs avec des body limit diff :\
+\pard\pardeftab720\sa240\partightenfactor0
+\cf0 Serveur 1 : limite = 100 octets \uc0\u8594  doit rejeter ( 413 )
+\f0\b\fs48 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f2\b0\fs26 \cf0 head -c 10000000 /dev/zero | \\ curl -X POST <http://localhost:8080/upload/big.txt> --data-binary @-
+\f1\fs24 \
+\pard\pardeftab720\sa240\partightenfactor0
+\cf0 Serveur 4 (8081) : limite = 1 000 000 000 \uc0\u8594  doit accepter ( 200 ok)
+\f0\b\fs48 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f2\b0\fs26 \cf0 head -c 10000000 /dev/zero | \\ curl -X POST <http://localhost:8081/upload/big.txt> --data-binary @-
+\f1\fs24 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b \cf0 \'b7 Routes vers des r\'e9pertoires diff\'e9rents
+\f1\b0 \uc0\u8232 Oui, on a bien :\u8232 / \u8594  ./www\u8232 /upload \u8594  ./www/upload\u8232 /cgi-bin \u8594  ./www/cgi-bin (avec CGI activ\'e9)\u8232 /old-site \u8594  redirect 301 vers /\u8232 les commandes :\u8232 
+\f2\fs26 curl <http://127.0.0.1:8080/> curl <http://127.0.0.1:8080/upload> curl <http://127.0.0.1:8080/old-site
+\f1\fs24 >\
+
+\f0\b \'b7 Fichier par d\'e9faut pour un r\'e9pertoire
+\f1\b0 \uc0\u8232 Oui, index index.html pour tous les serveurs, sauf le virtual host qui a un diff avec vhost.html\
+
+\f0\b \'b7 M\'e9thodes accept\'e9es par route
+\f1\b0 \uc0\u8232 Check avec le serveur 8083 car m\'e9thodes limit\'e9es\
+\pard\pardeftab720\sa321\partightenfactor0
+\cf0 /upload n'accepte que POST sur 8083 ( donc 405 methode not allowed )
+\f0\b\fs48 \
+
+\f2\b0\fs26 curl -X GET <http://127.0.0.1:8083/upload> curl -X DELETE <http://127.0.0.1:8083/upload
+\f1\fs24 >\uc0\u8232 mais fonctionne pour\u8232 
+\f2\fs26 curl -v -X POST <http://localhost:8080/upload/a.txt> \\ -d "hello"
+\f1\fs24 \
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f0\b\fs28 \cf0 Basic checks\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 Liste de tous les test dans doc s\'e9par\'e9 :\uc0\u8232 {\field{\*\fldinst{HYPERLINK "https://app.notion.com/p/Testing-pour-eval-3775526d716b80acb4cbea732a57deda"}}{\fldrslt \cf3 \ul \ulc3 \strokec3 https://app.notion.com/p/Testing-pour-eval-3775526d716b80acb4cbea732a57deda}}\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f0\b\fs28 \cf0 Check CGI\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 Liste de tous les test dans doc s\'e9par\'e9 :\uc0\u8232 {\field{\*\fldinst{HYPERLINK "https://app.notion.com/p/Testing-pour-eval-3775526d716b80acb4cbea732a57deda"}}{\fldrslt \cf3 \ul \ulc3 \strokec3 https://app.notion.com/p/Testing-pour-eval-3775526d716b80acb4cbea732a57deda}}\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f0\b\fs28 \cf0 Check with a browser\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 Page normale 
+\f2\fs26 http://127.0.0.1:8080/
+\f1\fs24 \uc0\u8232 URL incorrecte (404) 
+\f2\fs26 http://127.0.0.1:8080/nope
+\f1\fs24 \uc0\u8232 Listing r\'e9pertoire 
+\f2\fs26 http://127.0.0.1:8080/upload/
+\f1\fs24 \uc0\u8232 Redirection 301 
+\f2\fs26 http://127.0.0.1:8080/old-site
+\f1\fs24 \
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f0\b\fs28 \cf0 Port issues\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 Multiple ports et website different : Oui, chaque serveur a des spe differentes\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f0\b\fs28 \cf0 Siege & stress test\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 Siege\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f2\fs26 \cf0 siege -b <http://127.0.0.1:8084/
+\f1\fs24 >\
+No leaks\
+No hanging connexion\
+Commande Valgrind :\
+
+\f2\fs26 valgrind --leak-check=full --show-leak-kinds=all --track-fds=yes --log-file=valgrind.log ./Webserv config/config.conf
+\f1\fs24 \
+}
